@@ -80,8 +80,8 @@ var keys = keyMap{
 		key.WithHelp("?", "help"),
 	),
 	Quit: key.NewBinding(
-		key.WithKeys("q", "ctrl+c"),
-		key.WithHelp("q", "quit"),
+		key.WithKeys("q", "ctrl+c", "esc"),
+		key.WithHelp("q/esc", "quit"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
@@ -91,10 +91,41 @@ var keys = keyMap{
 	),
 }
 
-// Number keys for quick jump (1-9)
+// Number keys for quick jump
+// 1-9 = tasks 1-9
+// 0 = task 10
+// !@#$%^&*( (shift+1-9-0) = tasks 11-20
 func isNumberKey(s string) (int, bool) {
-	if len(s) == 1 && s[0] >= '1' && s[0] <= '9' {
+	if len(s) != 1 {
+		return 0, false
+	}
+
+	// 1-9 for tasks 1-9
+	if s[0] >= '1' && s[0] <= '9' {
 		return int(s[0] - '0'), true
 	}
+
+	// 0 for task 10
+	if s[0] == '0' {
+		return 10, true
+	}
+
+	// Shift+number for tasks 11-20
+	shiftMap := map[byte]int{
+		'!': 11, // shift+1
+		'@': 12, // shift+2
+		'#': 13, // shift+3
+		'$': 14, // shift+4
+		'%': 15, // shift+5
+		'^': 16, // shift+6
+		'&': 17, // shift+7
+		'*': 18, // shift+8
+		'(': 19, // shift+9
+		')': 20, // shift+0
+	}
+	if num, ok := shiftMap[s[0]]; ok {
+		return num, true
+	}
+
 	return 0, false
 }

@@ -4,21 +4,61 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m model) View() string {
+	var content string
+
 	switch m.mode {
 	case modeRollover:
-		return m.viewRollover()
+		content = m.viewRollover()
 	case modeHelp:
-		return m.viewHelp()
+		content = m.viewHelp()
 	case modeConfirmDelete:
-		return m.viewConfirmDelete()
+		content = m.viewConfirmDelete()
 	case modeDatePicker:
-		return m.viewDatePicker()
+		content = m.viewDatePicker()
 	default:
-		return m.viewNormal()
+		content = m.viewNormal()
 	}
+
+	// Center content in terminal
+	return m.centerView(content)
+}
+
+func (m model) centerView(content string) string {
+	width := m.width
+	height := m.height
+	if width < 20 {
+		width = 80
+	}
+	if height < 10 {
+		height = 24
+	}
+
+	// Get content dimensions
+	contentWidth := lipgloss.Width(content)
+	contentHeight := lipgloss.Height(content)
+
+	// Calculate padding
+	padX := (width - contentWidth) / 2
+	padY := (height - contentHeight) / 2
+
+	if padX < 0 {
+		padX = 0
+	}
+	if padY < 0 {
+		padY = 0
+	}
+
+	// Apply horizontal centering
+	style := lipgloss.NewStyle().
+		PaddingLeft(padX).
+		PaddingTop(padY)
+
+	return style.Render(content)
 }
 
 func (m model) viewNormal() string {
@@ -30,8 +70,14 @@ func (m model) viewNormal() string {
 		width = 80
 	}
 
-	// Title
-	b.WriteString(titleStyle.Render("tuido"))
+	// Constrain content width for readability
+	contentWidth := min(60, width-8)
+	if contentWidth < 30 {
+		contentWidth = 30
+	}
+
+	// Logo
+	b.WriteString(logoStyle.Render(logo))
 	b.WriteString("\n\n")
 
 	// Date header with optional "today" badge
@@ -44,7 +90,7 @@ func (m model) viewNormal() string {
 	b.WriteString("\n")
 
 	// Separator
-	sepWidth := min(52, width-8)
+	sepWidth := min(contentWidth-4, 50)
 	if sepWidth < 10 {
 		sepWidth = 10
 	}
@@ -91,19 +137,26 @@ func (m model) viewNormal() string {
 	b.WriteString("\n")
 	b.WriteString(m.viewFooter())
 
-	return containerStyle.Width(width - 4).Render(b.String())
+	return containerStyle.Width(contentWidth).Render(b.String())
 }
 
 func (m model) renderTask(t Task, index int, selected bool) string {
 	var parts []string
 
-	// Number (1-9, then blank)
+	// Number key hint
+	// 1-9 for tasks 1-9, 0 for task 10, then blank
 	num := ""
 	if index < 9 {
 		if selected {
 			num = helpKeyStyle.Render(fmt.Sprintf("%d", index+1))
 		} else {
 			num = helpDescStyle.Render(fmt.Sprintf("%d", index+1))
+		}
+	} else if index == 9 {
+		if selected {
+			num = helpKeyStyle.Render("0")
+		} else {
+			num = helpDescStyle.Render("0")
 		}
 	} else {
 		num = " "
@@ -188,7 +241,8 @@ func (m model) viewHelp() string {
 		helpKeyStyle.Render("  t        ") + "Jump to today",
 		helpKeyStyle.Render("  g        ") + "Go to specific date",
 		helpKeyStyle.Render("  j/k ↑/↓  ") + "Move selection",
-		helpKeyStyle.Render("  1-9      ") + "Jump to task #",
+		helpKeyStyle.Render("  1-0      ") + "Jump to task 1-10",
+		helpKeyStyle.Render("  !-⇧0     ") + "Jump to task 11-20",
 	}
 	b.WriteString(strings.Join(navItems, "\n"))
 	b.WriteString("\n")
@@ -212,7 +266,7 @@ func (m model) viewHelp() string {
 	b.WriteString("\n")
 	generalItems := []string{
 		helpKeyStyle.Render("  ?        ") + "Toggle help",
-		helpKeyStyle.Render("  q        ") + "Quit",
+		helpKeyStyle.Render("  q/esc    ") + "Quit",
 	}
 	b.WriteString(strings.Join(generalItems, "\n"))
 	b.WriteString("\n\n")

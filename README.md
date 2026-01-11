@@ -25,7 +25,7 @@ go install github.com/bill0x2a/tuido@latest
 Or clone and build:
 
 ```bash
-git clone https://github.com/yourusername/tuido
+git clone https://github.com/bill0x2a/tuido
 cd tuido
 make install
 ```
@@ -33,7 +33,7 @@ make install
 ### Manual install
 
 ```bash
-git clone https://github.com/yourusername/tuido
+git clone https://github.com/bill0x2a/tuido
 cd tuido
 go build -o tuido
 sudo mv tuido /usr/local/bin/

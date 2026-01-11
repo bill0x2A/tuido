@@ -99,8 +99,3 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
-
-// View renders the UI - stub for now, will be replaced in view.go
-func (m model) View() string {
-	return "tuido - loading... press q to quit\n"
-}

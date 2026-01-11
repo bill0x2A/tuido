@@ -19,7 +19,7 @@ A minimal TUI todo app with day-based task management.
 ### From source (requires Go 1.21+)
 
 ```bash
-go install github.com/yourusername/tuido@latest
+go install github.com/bill0x2a/tuido@latest
 ```
 
 Or clone and build:

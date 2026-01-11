@@ -6,11 +6,14 @@ A minimal TUI todo app with day-based task management.
 
 ## Features
 
-- **Day-based tasks** - Navigate between days with arrow keys
+- **Day-based tasks** - Navigate between days with arrow keys or `h`/`l`
+- **Quick jump** - Press `1-9` to jump directly to a task
 - **Task rollover** - Incomplete tasks from past days prompt for rollover
-- **Vim-style navigation** - Use `j`/`k` to move, `J`/`K` to reorder
+- **Move to tomorrow** - Press `>` or `n` to bump a task to the next day
+- **Auto-sort** - Completed tasks automatically move to the bottom
+- **Vim-style navigation** - Use `j`/`k` to move, `J`/`K` or `Shift+↑/↓` to reorder
 - **Persistent storage** - Tasks saved to `~/.local/share/tuido/tasks.json`
-- **Clean TUI** - Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss)
+- **Refined TUI** - Clean, intentional design with a cohesive color palette
 
 ## Installation
 
@@ -49,7 +52,8 @@ tuido
 | Key | Action |
 |-----|--------|
 | `j` / `k` or `↑` / `↓` | Move selection up/down |
-| `←` / `→` | Previous/next day |
+| `1-9` | Jump to task # |
+| `←` / `→` or `h` / `l` | Previous/next day |
 | `t` | Jump to today |
 | `g` | Go to specific date |
 
@@ -58,9 +62,10 @@ tuido
 |-----|--------|
 | `a` | Add new task |
 | `e` | Edit selected task |
-| `Enter` / `Space` | Toggle done |
+| `x` / `Enter` / `Space` | Toggle done |
 | `d` | Delete task |
-| `J` / `K` | Move task up/down |
+| `>` / `n` | Move task to tomorrow |
+| `J` / `K` or `Shift+↑/↓` | Reorder task |
 
 ### General
 | Key | Action |

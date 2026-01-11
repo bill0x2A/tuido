@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -65,6 +66,14 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	tasks := m.tasksForDate(m.currentDate)
 
+	// Handle number keys 1-9 for quick jump
+	if num, ok := isNumberKey(msg.String()); ok {
+		if num <= len(tasks) {
+			m.cursor = num - 1
+		}
+		return m, nil
+	}
+
 	switch {
 	case key.Matches(msg, keys.Up):
 		if m.cursor > 0 {
@@ -98,7 +107,7 @@ func (m model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Add):
 		m.mode = modeAdding
 		m.textInput.Reset()
-		m.textInput.Placeholder = "Task description..."
+		m.textInput.Placeholder = "What needs to be done?"
 		m.textInput.Focus()
 		return m, nil
 
@@ -113,7 +122,17 @@ func (m model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.Toggle):
 		if len(tasks) > 0 && m.cursor < len(tasks) {
-			m.toggleTask(tasks[m.cursor].ID)
+			taskID := tasks[m.cursor].ID
+			m.toggleTask(taskID)
+			m.sortTasksForDate(m.currentDate)
+			// Find where the task ended up after sorting
+			newTasks := m.tasksForDate(m.currentDate)
+			for i, t := range newTasks {
+				if t.ID == taskID {
+					m.cursor = i
+					break
+				}
+			}
 			return m, m.saveTasks
 		}
 
@@ -131,15 +150,30 @@ func (m model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, keys.MoveUp):
 		if len(tasks) > 1 && m.cursor > 0 {
-			m.swapTasks(tasks[m.cursor].ID, tasks[m.cursor-1].ID)
-			m.cursor--
-			return m, m.saveTasks
+			// Only allow moving within incomplete tasks
+			if !tasks[m.cursor].Done && !tasks[m.cursor-1].Done {
+				m.swapTasks(tasks[m.cursor].ID, tasks[m.cursor-1].ID)
+				m.cursor--
+				return m, m.saveTasks
+			}
 		}
 
 	case key.Matches(msg, keys.MoveDown):
 		if len(tasks) > 1 && m.cursor < len(tasks)-1 {
-			m.swapTasks(tasks[m.cursor].ID, tasks[m.cursor+1].ID)
-			m.cursor++
+			// Only allow moving within incomplete tasks
+			if !tasks[m.cursor].Done && !tasks[m.cursor+1].Done {
+				m.swapTasks(tasks[m.cursor].ID, tasks[m.cursor+1].ID)
+				m.cursor++
+				return m, m.saveTasks
+			}
+		}
+
+	case key.Matches(msg, keys.MoveNext):
+		if len(tasks) > 0 && m.cursor < len(tasks) {
+			m.moveTaskToNextDay(tasks[m.cursor].ID)
+			if m.cursor >= len(m.tasksForDate(m.currentDate)) {
+				m.cursor = max(0, m.cursor-1)
+			}
 			return m, m.saveTasks
 		}
 
@@ -162,7 +196,14 @@ func (m model) handleAddingMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if title != "" {
 			task := NewTask(title, m.currentDate)
 			m.tasks = append(m.tasks, task)
-			m.cursor = len(m.tasksForDate(m.currentDate)) - 1
+			// Position cursor at the new task (last incomplete task)
+			newTasks := m.tasksForDate(m.currentDate)
+			for i, t := range newTasks {
+				if t.ID == task.ID {
+					m.cursor = i
+					break
+				}
+			}
 		}
 		m.mode = modeNormal
 		m.textInput.Reset()
@@ -220,7 +261,6 @@ func (m model) handleRolloverMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeNormal
 
 	case "v", "V":
-		// TODO: show rollover list view
 		m.rollover = nil
 		m.mode = modeNormal
 	}
@@ -312,6 +352,69 @@ func (m *model) swapTasks(id1, id2 string) {
 	if i1 >= 0 && i2 >= 0 {
 		m.tasks[i1], m.tasks[i2] = m.tasks[i2], m.tasks[i1]
 	}
+}
+
+func (m *model) moveTaskToNextDay(id string) {
+	for i := range m.tasks {
+		if m.tasks[i].ID == id {
+			m.tasks[i].DueDate = m.currentDate.AddDate(0, 0, 1)
+			return
+		}
+	}
+}
+
+// sortTasksForDate sorts tasks for a specific date: incomplete first, then completed
+func (m *model) sortTasksForDate(date time.Time) {
+	// Get indices of tasks for this date
+	type taskIndex struct {
+		index int
+		done  bool
+	}
+	var indices []taskIndex
+	for i, t := range m.tasks {
+		if sameDay(t.DueDate, date) {
+			indices = append(indices, taskIndex{i, t.Done})
+		}
+	}
+
+	// Sort: incomplete first, then completed
+	sort.SliceStable(indices, func(i, j int) bool {
+		if indices[i].done != indices[j].done {
+			return !indices[i].done // incomplete (false) comes before completed (true)
+		}
+		return false // maintain relative order within groups
+	})
+
+	// Rebuild the task slice with sorted order for this date
+	var newTasks []Task
+	dateTaskIndices := make(map[int]bool)
+	for _, idx := range indices {
+		dateTaskIndices[idx.index] = true
+	}
+
+	// First, add non-date tasks in original order, inserting date tasks at first date task position
+	inserted := false
+	for i, t := range m.tasks {
+		if dateTaskIndices[i] {
+			if !inserted {
+				// Insert all date tasks here
+				for _, idx := range indices {
+					newTasks = append(newTasks, m.tasks[idx.index])
+				}
+				inserted = true
+			}
+		} else {
+			newTasks = append(newTasks, t)
+		}
+	}
+	// If date tasks were at the end
+	if !inserted {
+		for _, idx := range indices {
+			newTasks = append(newTasks, m.tasks[idx.index])
+		}
+	}
+
+	m.tasks = newTasks
 }
 
 func (m model) saveTasks() tea.Msg {

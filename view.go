@@ -30,105 +30,196 @@ func (m model) viewNormal() string {
 		width = 80
 	}
 
-	// Header with date
+	// Title
+	b.WriteString(titleStyle.Render("tuido"))
+	b.WriteString("\n\n")
+
+	// Date header with optional "today" badge
 	dateStr := m.currentDate.Format("Monday, January 2, 2006")
 	header := dateStyle.Render(dateStr)
 	if sameDay(m.currentDate, normalizeDate(timeNow())) {
-		header += " (today)"
+		header += todayBadge.Render("TODAY")
 	}
-	b.WriteString(titleStyle.Render("tuido") + "\n\n")
-	b.WriteString(header + "\n")
-	b.WriteString(strings.Repeat("─", min(50, width-4)) + "\n\n")
+	b.WriteString(header)
+	b.WriteString("\n")
+
+	// Separator
+	sepWidth := min(52, width-8)
+	if sepWidth < 10 {
+		sepWidth = 10
+	}
+	b.WriteString(separatorStyle.Render(strings.Repeat("─", sepWidth)))
+	b.WriteString("\n\n")
 
 	// Tasks
 	tasks := m.tasksForDate(m.currentDate)
 	if len(tasks) == 0 {
-		empty := helpStyle.Render("No tasks for this day. Press 'a' to add one.")
-		b.WriteString(empty + "\n")
+		b.WriteString(emptyStyle.Render("No tasks for this day. Press 'a' to add one."))
+		b.WriteString("\n")
 	} else {
+		// Count incomplete vs complete
+		incomplete := 0
+		for _, t := range tasks {
+			if !t.Done {
+				incomplete++
+			}
+		}
+
 		for i, task := range tasks {
-			b.WriteString(m.renderTask(task, i == m.cursor) + "\n")
+			b.WriteString(m.renderTask(task, i, i == m.cursor))
+			b.WriteString("\n")
+		}
+
+		// Task count summary
+		if len(tasks) > 0 {
+			complete := len(tasks) - incomplete
+			summary := fmt.Sprintf("%d of %d complete", complete, len(tasks))
+			b.WriteString("\n")
+			b.WriteString(countStyle.Render(summary))
+			b.WriteString("\n")
 		}
 	}
 
 	// Input field if adding/editing
 	if m.mode == modeAdding || m.mode == modeEditing {
-		b.WriteString("\n" + m.textInput.View() + "\n")
+		b.WriteString("\n")
+		b.WriteString(m.textInput.View())
+		b.WriteString("\n")
 	}
 
 	// Footer
-	b.WriteString("\n" + m.viewFooter())
+	b.WriteString("\n")
+	b.WriteString(m.viewFooter())
 
-	return borderStyle.Width(width - 4).Render(b.String())
+	return containerStyle.Width(width - 4).Render(b.String())
 }
 
-func (m model) renderTask(t Task, selected bool) string {
-	var checkbox string
-	if t.Done {
-		checkbox = checkboxDone
+func (m model) renderTask(t Task, index int, selected bool) string {
+	var parts []string
+
+	// Number (1-9, then blank)
+	num := ""
+	if index < 9 {
+		if selected {
+			num = helpKeyStyle.Render(fmt.Sprintf("%d", index+1))
+		} else {
+			num = helpDescStyle.Render(fmt.Sprintf("%d", index+1))
+		}
 	} else {
-		checkbox = checkboxEmpty
+		num = " "
+	}
+	parts = append(parts, num)
+
+	// Cursor
+	if selected {
+		parts = append(parts, cursorStyle)
+	} else {
+		parts = append(parts, cursorEmpty)
 	}
 
+	// Checkbox
+	if t.Done {
+		parts = append(parts, checkboxDone)
+	} else if selected {
+		parts = append(parts, checkboxSelected)
+	} else {
+		parts = append(parts, checkboxEmpty)
+	}
+
+	// Title
 	title := t.Title
 	if t.Done {
-		title = doneStyle.Render(title)
-	}
-
-	var cursor string
-	if selected {
-		cursor = cursorStyle
+		title = taskTitleDoneStyle.Render(title)
+	} else if selected {
+		title = taskTitleSelectedStyle.Render(title)
 	} else {
-		cursor = "  "
+		title = taskTitleStyle.Render(title)
 	}
+	parts = append(parts, " "+title)
 
-	line := fmt.Sprintf("%s%s  %s", cursor, checkbox, title)
-
+	// Rollover indicator
 	if t.IsRolledOver() {
-		line += "  " + rolloverIcon
+		parts = append(parts, rolloverIcon)
 	}
 
-	return line
+	return strings.Join(parts, "")
 }
 
 func (m model) viewFooter() string {
 	hints := []string{
-		"←→ days",
-		"a add",
-		"⏎ toggle",
-		"? help",
+		helpKeyStyle.Render("←→") + helpDescStyle.Render(" days"),
+		helpKeyStyle.Render("a") + helpDescStyle.Render(" add"),
+		helpKeyStyle.Render("x") + helpDescStyle.Render(" done"),
+		helpKeyStyle.Render(">") + helpDescStyle.Render(" tomorrow"),
+		helpKeyStyle.Render("?") + helpDescStyle.Render(" help"),
 	}
-	return helpStyle.Render(strings.Join(hints, "  "))
+	return strings.Join(hints, "  ")
 }
 
 func (m model) viewRollover() string {
 	var b strings.Builder
+
+	b.WriteString(dialogTitleStyle.Render("Rollover Tasks"))
+	b.WriteString("\n\n")
 	b.WriteString(fmt.Sprintf("%d incomplete tasks from previous days.\n", len(m.rollover)))
 	b.WriteString("Roll them over to today?\n\n")
-	b.WriteString("[Y] Yes     [N] No     [V] View\n")
+
+	options := []string{
+		dialogKeyStyle.Render("[Y]") + " Yes, move to today",
+		dialogKeyStyle.Render("[N]") + " No, leave them",
+		dialogKeyStyle.Render("[V]") + " View tasks",
+	}
+	b.WriteString(strings.Join(options, "    "))
+
 	return dialogStyle.Render(b.String())
 }
 
 func (m model) viewHelp() string {
-	help := `Navigation:
-  ←/→      Previous/next day
-  t        Jump to today
-  g        Go to date
-  j/k ↑/↓  Move selection
+	var b strings.Builder
 
-Tasks:
-  a        Add task
-  e        Edit task
-  ⏎/space  Toggle done
-  d        Delete task
-  J/K      Reorder task
+	b.WriteString(dialogTitleStyle.Render("Keyboard Shortcuts"))
+	b.WriteString("\n")
 
-General:
-  ?        Toggle help
-  q        Quit
+	// Navigation section
+	b.WriteString(sectionStyle.Render("Navigation"))
+	b.WriteString("\n")
+	navItems := []string{
+		helpKeyStyle.Render("  ←/→ h/l  ") + "Previous/next day",
+		helpKeyStyle.Render("  t        ") + "Jump to today",
+		helpKeyStyle.Render("  g        ") + "Go to specific date",
+		helpKeyStyle.Render("  j/k ↑/↓  ") + "Move selection",
+		helpKeyStyle.Render("  1-9      ") + "Jump to task #",
+	}
+	b.WriteString(strings.Join(navItems, "\n"))
+	b.WriteString("\n")
 
-Press any key to close help`
-	return dialogStyle.Render(help)
+	// Tasks section
+	b.WriteString(sectionStyle.Render("Tasks"))
+	b.WriteString("\n")
+	taskItems := []string{
+		helpKeyStyle.Render("  a        ") + "Add new task",
+		helpKeyStyle.Render("  e        ") + "Edit task",
+		helpKeyStyle.Render("  x/⏎/space") + "Toggle done",
+		helpKeyStyle.Render("  d        ") + "Delete task",
+		helpKeyStyle.Render("  >/n      ") + "Move to tomorrow",
+		helpKeyStyle.Render("  J/K ⇧↑/↓ ") + "Reorder task",
+	}
+	b.WriteString(strings.Join(taskItems, "\n"))
+	b.WriteString("\n")
+
+	// General section
+	b.WriteString(sectionStyle.Render("General"))
+	b.WriteString("\n")
+	generalItems := []string{
+		helpKeyStyle.Render("  ?        ") + "Toggle help",
+		helpKeyStyle.Render("  q        ") + "Quit",
+	}
+	b.WriteString(strings.Join(generalItems, "\n"))
+	b.WriteString("\n\n")
+
+	b.WriteString(helpDescStyle.Render("Press any key to close"))
+
+	return dialogStyle.Render(b.String())
 }
 
 func (m model) viewConfirmDelete() string {
@@ -137,15 +228,26 @@ func (m model) viewConfirmDelete() string {
 		return ""
 	}
 	task := tasks[m.cursor]
-	msg := fmt.Sprintf("Delete task?\n\n\"%s\"\n\n[Y] Yes  [N] No", task.Title)
-	return dialogStyle.Render(msg)
+
+	var b strings.Builder
+	b.WriteString(dialogTitleStyle.Render("Delete Task?"))
+	b.WriteString("\n\n")
+	b.WriteString(fmt.Sprintf("\"%s\"\n\n", task.Title))
+	b.WriteString(dialogKeyStyle.Render("[Y]") + " Yes  ")
+	b.WriteString(dialogKeyStyle.Render("[N]") + " No")
+
+	return dialogStyle.Render(b.String())
 }
 
 func (m model) viewDatePicker() string {
 	var b strings.Builder
-	b.WriteString("Go to date:\n\n")
-	b.WriteString(m.textInput.View() + "\n\n")
-	b.WriteString(helpStyle.Render("Format: 2025-01-15 or +7 / -3"))
+
+	b.WriteString(dialogTitleStyle.Render("Go to Date"))
+	b.WriteString("\n\n")
+	b.WriteString(m.textInput.View())
+	b.WriteString("\n\n")
+	b.WriteString(helpDescStyle.Render("Format: 2025-01-15 or +7 / -3"))
+
 	return dialogStyle.Render(b.String())
 }
 

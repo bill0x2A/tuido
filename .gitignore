@@ -1,0 +1,9 @@
+# Binary
+tuido
+
+# Test binaries
+*.test
+
+# IDE
+.idea/
+.vscode/

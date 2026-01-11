@@ -24,6 +24,12 @@ func (m model) View() string {
 func (m model) viewNormal() string {
 	var b strings.Builder
 
+	// Use default width if not set yet
+	width := m.width
+	if width < 20 {
+		width = 80
+	}
+
 	// Header with date
 	dateStr := m.currentDate.Format("Monday, January 2, 2006")
 	header := dateStyle.Render(dateStr)
@@ -32,7 +38,7 @@ func (m model) viewNormal() string {
 	}
 	b.WriteString(titleStyle.Render("tuido") + "\n\n")
 	b.WriteString(header + "\n")
-	b.WriteString(strings.Repeat("─", min(50, m.width-4)) + "\n\n")
+	b.WriteString(strings.Repeat("─", min(50, width-4)) + "\n\n")
 
 	// Tasks
 	tasks := m.tasksForDate(m.currentDate)
@@ -53,7 +59,7 @@ func (m model) viewNormal() string {
 	// Footer
 	b.WriteString("\n" + m.viewFooter())
 
-	return borderStyle.Width(m.width - 4).Render(b.String())
+	return borderStyle.Width(width - 4).Render(b.String())
 }
 
 func (m model) renderTask(t Task, selected bool) string {

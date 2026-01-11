@@ -270,7 +270,7 @@ func (m model) viewFooter() string {
 		helpKeyStyle.Render("←→") + helpDescStyle.Render(" days"),
 		helpKeyStyle.Render("a") + helpDescStyle.Render(" add"),
 		helpKeyStyle.Render("x") + helpDescStyle.Render(" done"),
-		helpKeyStyle.Render(">") + helpDescStyle.Render(" tomorrow"),
+		helpKeyStyle.Render("<>") + helpDescStyle.Render(" move day"),
 		helpKeyStyle.Render("?") + helpDescStyle.Render(" help"),
 	}
 	return strings.Join(hints, "  ")
@@ -322,7 +322,8 @@ func (m model) viewHelp() string {
 		helpKeyStyle.Render("  e        ") + "Edit task",
 		helpKeyStyle.Render("  x/⏎/space") + "Toggle done",
 		helpKeyStyle.Render("  d        ") + "Delete task",
-		helpKeyStyle.Render("  >/n      ") + "Move to tomorrow",
+		helpKeyStyle.Render("  >        ") + "Move to tomorrow",
+		helpKeyStyle.Render("  <        ") + "Move to yesterday",
 		helpKeyStyle.Render("  J/K ⇧↑/↓ ") + "Reorder task",
 	}
 	b.WriteString(strings.Join(taskItems, "\n"))

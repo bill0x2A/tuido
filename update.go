@@ -177,6 +177,15 @@ func (m model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.saveTasks
 		}
 
+	case key.Matches(msg, keys.MovePrev):
+		if len(tasks) > 0 && m.cursor < len(tasks) {
+			m.moveTaskToPrevDay(tasks[m.cursor].ID)
+			if m.cursor >= len(m.tasksForDate(m.currentDate)) {
+				m.cursor = max(0, m.cursor-1)
+			}
+			return m, m.saveTasks
+		}
+
 	case key.Matches(msg, keys.Help):
 		m.mode = modeHelp
 	}
@@ -358,6 +367,15 @@ func (m *model) moveTaskToNextDay(id string) {
 	for i := range m.tasks {
 		if m.tasks[i].ID == id {
 			m.tasks[i].DueDate = m.currentDate.AddDate(0, 0, 1)
+			return
+		}
+	}
+}
+
+func (m *model) moveTaskToPrevDay(id string) {
+	for i := range m.tasks {
+		if m.tasks[i].ID == id {
+			m.tasks[i].DueDate = m.currentDate.AddDate(0, 0, -1)
 			return
 		}
 	}

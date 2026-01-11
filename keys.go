@@ -16,6 +16,7 @@ type keyMap struct {
 	MoveUp    key.Binding
 	MoveDown  key.Binding
 	MoveNext  key.Binding // Move task to next day
+	MovePrev  key.Binding // Move task to previous day
 	Help      key.Binding
 	Quit      key.Binding
 	Enter     key.Binding
@@ -72,8 +73,12 @@ var keys = keyMap{
 		key.WithHelp("J/⇧↓", "move down"),
 	),
 	MoveNext: key.NewBinding(
-		key.WithKeys(">", "n"),
-		key.WithHelp(">/n", "→ tomorrow"),
+		key.WithKeys(">"),
+		key.WithHelp(">", "→ tomorrow"),
+	),
+	MovePrev: key.NewBinding(
+		key.WithKeys("<"),
+		key.WithHelp("<", "← yesterday"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),

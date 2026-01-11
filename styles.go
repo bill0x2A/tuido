@@ -2,11 +2,6 @@ package main
 
 import "github.com/charmbracelet/lipgloss"
 
-// ASCII art logo
-var logo = `┌┬┐┬ ┬┬┌┬┐┌─┐
- │ │ ││ │││ │
- ┴ └─┘┴─┴┘└─┘`
-
 // Color palette - warm, muted tones with purposeful accents
 var (
 	// Base colors
@@ -22,16 +17,10 @@ var (
 	warning   = lipgloss.AdaptiveColor{Light: "#f59e0b", Dark: "#fcd34d"}  // Amber
 	rose      = lipgloss.AdaptiveColor{Light: "#f43f5e", Dark: "#fb7185"}  // Rose
 
-	// App title - bold accent
+	// App title - bold accent (unused but kept for potential future use)
 	titleStyle = lipgloss.NewStyle().
 			Foreground(accent).
 			Bold(true)
-
-	// Logo style
-	logoStyle = lipgloss.NewStyle().
-			Foreground(accent).
-			Bold(true).
-			MarginBottom(1)
 
 	// Date header - prominent but not overwhelming
 	dateStyle = lipgloss.NewStyle().

@@ -70,15 +70,15 @@ func (m model) viewNormal() string {
 		width = 80
 	}
 
-	// Constrain content width for readability
-	contentWidth := min(60, width-8)
-	if contentWidth < 30 {
-		contentWidth = 30
+	// Constrain content width - allow more space
+	contentWidth := min(100, width-8)
+	if contentWidth < 40 {
+		contentWidth = 40
 	}
 
-	// Logo
-	b.WriteString(logoStyle.Render(logo))
-	b.WriteString("\n\n")
+	// Calculate text area width (after number, cursor, checkbox, space)
+	// Format: "1▸ ○ Task text" = 1 + 2 + 1 + 1 = 5 chars prefix
+	textAreaWidth := contentWidth - 12 // Account for padding and prefix
 
 	// Date header with optional "today" badge
 	dateStr := m.currentDate.Format("Monday, January 2, 2006")
@@ -112,7 +112,7 @@ func (m model) viewNormal() string {
 		}
 
 		for i, task := range tasks {
-			b.WriteString(m.renderTask(task, i, i == m.cursor))
+			b.WriteString(m.renderTask(task, i, i == m.cursor, textAreaWidth))
 			b.WriteString("\n")
 		}
 
@@ -140,62 +140,129 @@ func (m model) viewNormal() string {
 	return containerStyle.Width(contentWidth).Render(b.String())
 }
 
-func (m model) renderTask(t Task, index int, selected bool) string {
-	var parts []string
+func (m model) renderTask(t Task, index int, selected bool, maxWidth int) string {
+	// Build prefix: "1▸ ○ " or "  ○ " etc
+	var prefix strings.Builder
 
-	// Number key hint
-	// 1-9 for tasks 1-9, 0 for task 10, then blank
-	num := ""
+	// Number key hint (1 char)
 	if index < 9 {
 		if selected {
-			num = helpKeyStyle.Render(fmt.Sprintf("%d", index+1))
+			prefix.WriteString(helpKeyStyle.Render(fmt.Sprintf("%d", index+1)))
 		} else {
-			num = helpDescStyle.Render(fmt.Sprintf("%d", index+1))
+			prefix.WriteString(helpDescStyle.Render(fmt.Sprintf("%d", index+1)))
 		}
 	} else if index == 9 {
 		if selected {
-			num = helpKeyStyle.Render("0")
+			prefix.WriteString(helpKeyStyle.Render("0"))
 		} else {
-			num = helpDescStyle.Render("0")
+			prefix.WriteString(helpDescStyle.Render("0"))
 		}
 	} else {
-		num = " "
+		prefix.WriteString(" ")
 	}
-	parts = append(parts, num)
 
-	// Cursor
+	// Cursor (2 chars)
 	if selected {
-		parts = append(parts, cursorStyle)
+		prefix.WriteString(cursorStyle)
 	} else {
-		parts = append(parts, cursorEmpty)
+		prefix.WriteString(cursorEmpty)
 	}
 
-	// Checkbox
+	// Checkbox (1 char)
 	if t.Done {
-		parts = append(parts, checkboxDone)
+		prefix.WriteString(checkboxDone)
 	} else if selected {
-		parts = append(parts, checkboxSelected)
+		prefix.WriteString(checkboxSelected)
 	} else {
-		parts = append(parts, checkboxEmpty)
+		prefix.WriteString(checkboxEmpty)
 	}
 
-	// Title
+	// Space before title
+	prefix.WriteString(" ")
+
+	prefixStr := prefix.String()
+	// Prefix visual width: 1 (num) + 2 (cursor) + 1 (checkbox) + 1 (space) = 5
+	prefixWidth := 5
+
+	// Build title with optional rollover icon
 	title := t.Title
-	if t.Done {
-		title = taskTitleDoneStyle.Render(title)
-	} else if selected {
-		title = taskTitleSelectedStyle.Render(title)
-	} else {
-		title = taskTitleStyle.Render(title)
-	}
-	parts = append(parts, " "+title)
-
-	// Rollover indicator
 	if t.IsRolledOver() {
-		parts = append(parts, rolloverIcon)
+		title += " ↻"
 	}
 
-	return strings.Join(parts, "")
+	// Wrap title if needed
+	if maxWidth > 0 && len(title) > maxWidth {
+		lines := wrapText(title, maxWidth)
+		var result strings.Builder
+
+		for i, line := range lines {
+			if i == 0 {
+				// First line gets the full prefix
+				result.WriteString(prefixStr)
+			} else {
+				// Subsequent lines get blank padding to align with text
+				result.WriteString(strings.Repeat(" ", prefixWidth))
+			}
+
+			// Style the line
+			styledLine := line
+			if t.Done {
+				styledLine = taskTitleDoneStyle.Render(line)
+			} else if selected {
+				styledLine = taskTitleSelectedStyle.Render(line)
+			} else {
+				styledLine = taskTitleStyle.Render(line)
+			}
+			result.WriteString(styledLine)
+
+			if i < len(lines)-1 {
+				result.WriteString("\n")
+			}
+		}
+		return result.String()
+	}
+
+	// No wrapping needed
+	styledTitle := title
+	if t.Done {
+		styledTitle = taskTitleDoneStyle.Render(title)
+	} else if selected {
+		styledTitle = taskTitleSelectedStyle.Render(title)
+	} else {
+		styledTitle = taskTitleStyle.Render(title)
+	}
+
+	return prefixStr + styledTitle
+}
+
+// wrapText wraps text at word boundaries to fit within maxWidth
+func wrapText(text string, maxWidth int) []string {
+	if maxWidth <= 0 || len(text) <= maxWidth {
+		return []string{text}
+	}
+
+	var lines []string
+	words := strings.Fields(text)
+	var currentLine strings.Builder
+
+	for _, word := range words {
+		if currentLine.Len() == 0 {
+			currentLine.WriteString(word)
+		} else if currentLine.Len()+1+len(word) <= maxWidth {
+			currentLine.WriteString(" ")
+			currentLine.WriteString(word)
+		} else {
+			lines = append(lines, currentLine.String())
+			currentLine.Reset()
+			currentLine.WriteString(word)
+		}
+	}
+
+	if currentLine.Len() > 0 {
+		lines = append(lines, currentLine.String())
+	}
+
+	return lines
 }
 
 func (m model) viewFooter() string {
